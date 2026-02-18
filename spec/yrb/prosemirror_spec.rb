@@ -95,6 +95,14 @@ RSpec.describe Yrb::Prosemirror do
   end
 
   describe ".json_to_fragment" do
+    it "returns nil for JSON without content key" do
+      doc = Y::Doc.new
+      fragment = doc.get_xml_fragment("default")
+      result = described_class.json_to_fragment(fragment, { "type" => "doc" })
+      expect(result).to be_nil
+      expect(fragment.size).to eq(0)
+    end
+
     it "populates fragment from simple paragraph JSON" do
       doc = Y::Doc.new
       fragment = doc.get_xml_fragment("default")
@@ -171,7 +179,43 @@ RSpec.describe Yrb::Prosemirror do
     end
   end
 
+  describe ".json_to_fragment with element marks" do
+    it "stores marks on element nodes" do
+      doc = Y::Doc.new
+      fragment = doc.get_xml_fragment("default")
+      json = {
+        "type" => "doc",
+        "content" => [{
+          "type" => "image",
+          "attrs" => { "src" => "photo.jpg" },
+          "marks" => [{ "type" => "link", "attrs" => { "href" => "https://example.com" } }]
+        }]
+      }
+      described_class.json_to_fragment(fragment, json)
+      image = fragment[0]
+      expect(image.tag).to eq("image")
+      expect(image.attrs).to include("src" => "photo.jpg")
+      marks = JSON.parse(image.attrs["marks"])
+      expect(marks.first["type"]).to eq("link")
+      expect(marks.first["attrs"]["href"]).to eq("https://example.com")
+    end
+  end
+
   describe ".update_fragment" do
+    it "updates an empty fragment" do
+      doc = Y::Doc.new
+      fragment = doc.get_xml_fragment("default")
+      expect(fragment.size).to eq(0)
+
+      json = {
+        "type" => "doc",
+        "content" => [{ "type" => "paragraph", "content" => [{ "type" => "text", "text" => "Fresh" }] }]
+      }
+      described_class.update_fragment(fragment, json)
+      expect(fragment.size).to eq(1)
+      expect(fragment[0][0].to_s).to eq("Fresh")
+    end
+
     it "replaces existing content" do
       doc = Y::Doc.new
       fragment = doc.get_xml_fragment("default")
@@ -258,6 +302,75 @@ RSpec.describe Yrb::Prosemirror do
           { "type" => "paragraph", "content" => [{ "type" => "text", "text" => "First" }] },
           { "type" => "paragraph", "content" => [{ "type" => "text", "text" => "Second" }] }
         ]
+      }
+      doc = Y::Doc.new
+      fragment = doc.get_xml_fragment("default")
+      described_class.json_to_fragment(fragment, json)
+      result = described_class.fragment_to_json(fragment)
+      expect(result).to eq(json)
+    end
+
+    it "round-trips text with a single mark" do
+      json = {
+        "type" => "doc",
+        "content" => [{
+          "type" => "paragraph",
+          "content" => [
+            { "type" => "text", "text" => "bold", "marks" => [{ "type" => "bold" }] },
+            { "type" => "text", "text" => " normal" }
+          ]
+        }]
+      }
+      doc = Y::Doc.new
+      fragment = doc.get_xml_fragment("default")
+      described_class.json_to_fragment(fragment, json)
+      result = described_class.fragment_to_json(fragment)
+      expect(result).to eq(json)
+    end
+
+    it "round-trips text with multiple marks" do
+      json = {
+        "type" => "doc",
+        "content" => [{
+          "type" => "paragraph",
+          "content" => [
+            { "type" => "text", "text" => "bold italic", "marks" => [{ "type" => "bold" }, { "type" => "italic" }] }
+          ]
+        }]
+      }
+      doc = Y::Doc.new
+      fragment = doc.get_xml_fragment("default")
+      described_class.json_to_fragment(fragment, json)
+      result = described_class.fragment_to_json(fragment)
+      expect(result).to eq(json)
+    end
+
+    it "round-trips mark with attributes" do
+      json = {
+        "type" => "doc",
+        "content" => [{
+          "type" => "paragraph",
+          "content" => [
+            { "type" => "text", "text" => "click here",
+              "marks" => [{ "type" => "link", "attrs" => { "href" => "https://example.com" } }] }
+          ]
+        }]
+      }
+      doc = Y::Doc.new
+      fragment = doc.get_xml_fragment("default")
+      described_class.json_to_fragment(fragment, json)
+      result = described_class.fragment_to_json(fragment)
+      expect(result).to eq(json)
+    end
+
+    it "round-trips element with marks" do
+      json = {
+        "type" => "doc",
+        "content" => [{
+          "type" => "image",
+          "attrs" => { "src" => "photo.jpg" },
+          "marks" => [{ "type" => "link", "attrs" => { "href" => "https://example.com" } }]
+        }]
       }
       doc = Y::Doc.new
       fragment = doc.get_xml_fragment("default")
