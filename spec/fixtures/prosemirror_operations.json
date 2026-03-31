@@ -1,0 +1,110 @@
+{
+  "operations": [
+    {
+      "name": "replace_text_simple",
+      "initial": {
+        "type": "doc",
+        "content": [
+          {"type": "paragraph", "content": [{"type": "text", "text": "Hello world"}]}
+        ]
+      },
+      "command": "replace_text",
+      "args": {"index": 0, "find": "world", "replace": "Ruby"},
+      "expected": {
+        "type": "doc",
+        "content": [
+          {"type": "paragraph", "content": [{"type": "text", "text": "Hello Ruby"}]}
+        ]
+      }
+    },
+    {
+      "name": "set_node_paragraph_to_heading",
+      "initial": {
+        "type": "doc",
+        "content": [
+          {"type": "paragraph", "content": [{"type": "text", "text": "Title text"}]}
+        ]
+      },
+      "command": "set_node",
+      "args": {"index": 0, "type": "heading", "attrs": {"level": 2}},
+      "expected": {
+        "type": "doc",
+        "content": [
+          {"type": "heading", "attrs": {"level": "2"}, "content": [{"type": "text", "text": "Title text"}]}
+        ]
+      }
+    },
+    {
+      "name": "set_node_heading_to_paragraph",
+      "initial": {
+        "type": "doc",
+        "content": [
+          {"type": "heading", "attrs": {"level": 1}, "content": [{"type": "text", "text": "Was heading"}]}
+        ]
+      },
+      "command": "set_node",
+      "args": {"index": 0, "type": "paragraph"},
+      "expected": {
+        "type": "doc",
+        "content": [
+          {"type": "paragraph", "content": [{"type": "text", "text": "Was heading"}]}
+        ]
+      }
+    },
+    {
+      "name": "insert_content_at_end",
+      "initial": {
+        "type": "doc",
+        "content": [
+          {"type": "paragraph", "content": [{"type": "text", "text": "Existing"}]}
+        ]
+      },
+      "command": "insert_content_at",
+      "args": {"index": 1, "blocks": [{"type": "paragraph", "text": "Appended"}]},
+      "expected": {
+        "type": "doc",
+        "content": [
+          {"type": "paragraph", "content": [{"type": "text", "text": "Existing"}]},
+          {"type": "paragraph", "content": [{"type": "text", "text": "Appended"}]}
+        ]
+      }
+    },
+    {
+      "name": "delete_range_single",
+      "initial": {
+        "type": "doc",
+        "content": [
+          {"type": "paragraph", "content": [{"type": "text", "text": "Keep"}]},
+          {"type": "paragraph", "content": [{"type": "text", "text": "Delete me"}]},
+          {"type": "paragraph", "content": [{"type": "text", "text": "Also keep"}]}
+        ]
+      },
+      "command": "delete_range",
+      "args": {"from": 1, "to": 1},
+      "expected": {
+        "type": "doc",
+        "content": [
+          {"type": "paragraph", "content": [{"type": "text", "text": "Keep"}]},
+          {"type": "paragraph", "content": [{"type": "text", "text": "Also keep"}]}
+        ]
+      }
+    },
+    {
+      "name": "set_title",
+      "initial": {
+        "type": "doc",
+        "content": [
+          {"type": "paragraph", "content": [{"type": "text", "text": "Old Title"}]}
+        ]
+      },
+      "command": "set_title",
+      "args": {"title": "New Title"},
+      "expected": {
+        "type": "doc",
+        "content": [
+          {"type": "paragraph", "content": [{"type": "text", "text": "New Title"}]}
+        ]
+      }
+    }
+  ]
+}

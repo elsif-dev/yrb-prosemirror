@@ -5,6 +5,7 @@ require "digest"
 require "base64"
 require "y-rb"
 require_relative "prosemirror/version"
+require_relative "prosemirror/commands"
 
 module Yrb
   # rubocop:disable Metrics/ModuleLength

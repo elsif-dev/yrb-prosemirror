@@ -1,0 +1,282 @@
+# frozen_string_literal: true
+
+require "spec_helper"
+
+RSpec.describe Yrb::Prosemirror::Commands do
+  let(:doc) { Y::Doc.new(gc: false) }
+  let(:frag) { doc.get_xml_fragment("content") }
+
+  def populate(content_json)
+    Yrb::Prosemirror.json_to_fragment(frag, {
+      "type" => "doc",
+      "content" => content_json
+    })
+  end
+
+  def paragraphs
+    frag.to_a.map { |el| el.to_a.map(&:to_s).join }
+  end
+
+  def fragment_json
+    Yrb::Prosemirror.fragment_to_json(frag)
+  end
+
+  describe ".replace_text" do
+    before do
+      populate([
+        {"type" => "paragraph", "content" => [{"type" => "text", "text" => "Hello world"}]},
+        {"type" => "paragraph", "content" => [{"type" => "text", "text" => "Second paragraph"}]}
+      ])
+    end
+
+    it "replaces text within a paragraph" do
+      described_class.replace_text(frag, index: 0, find: "world", replace: "Ruby")
+      expect(paragraphs[0]).to eq("Hello Ruby")
+    end
+
+    it "preserves other paragraphs" do
+      described_class.replace_text(frag, index: 0, find: "Hello", replace: "Hi")
+      expect(paragraphs[1]).to eq("Second paragraph")
+    end
+
+    it "handles replacement at start" do
+      described_class.replace_text(frag, index: 0, find: "Hello", replace: "Hi")
+      expect(paragraphs[0]).to eq("Hi world")
+    end
+
+    it "handles replacement that changes length" do
+      described_class.replace_text(frag, index: 0, find: "Hello world", replace: "Hi")
+      expect(paragraphs[0]).to eq("Hi")
+    end
+
+    it "raises when index out of range" do
+      expect {
+        described_class.replace_text(frag, index: 5, find: "x", replace: "y")
+      }.to raise_error(ArgumentError, /out of range/)
+    end
+
+    it "raises when text not found" do
+      expect {
+        described_class.replace_text(frag, index: 0, find: "missing", replace: "x")
+      }.to raise_error(ArgumentError, /not found/)
+    end
+  end
+
+  describe ".set_node" do
+    before do
+      populate([
+        {"type" => "heading", "attrs" => {"level" => 1}, "content" => [{"type" => "text", "text" => "Title"}]},
+        {"type" => "paragraph", "content" => [{"type" => "text", "text" => "Body text"}]}
+      ])
+    end
+
+    it "changes heading level surgically" do
+      described_class.set_node(frag, index: 0, type: "heading", attrs: {"level" => 2})
+      json = fragment_json
+      expect(json["content"][0]["attrs"]["level"]).to eq("2")
+    end
+
+    it "changes paragraph to heading" do
+      described_class.set_node(frag, index: 1, type: "heading", attrs: {"level" => 3})
+      json = fragment_json
+      expect(json["content"][1]["type"]).to eq("heading")
+    end
+
+    it "changes heading to paragraph" do
+      described_class.set_node(frag, index: 0, type: "paragraph")
+      json = fragment_json
+      expect(json["content"][0]["type"]).to eq("paragraph")
+    end
+
+    it "changes to blockquote" do
+      described_class.set_node(frag, index: 1, type: "blockquote")
+      json = fragment_json
+      expect(json["content"][1]["type"]).to eq("blockquote")
+    end
+
+    it "preserves text content on type change" do
+      described_class.set_node(frag, index: 0, type: "paragraph")
+      expect(paragraphs[0]).to eq("Title")
+    end
+
+    it "preserves other blocks" do
+      described_class.set_node(frag, index: 0, type: "paragraph")
+      expect(paragraphs[1]).to eq("Body text")
+    end
+
+    it "raises when index out of range" do
+      expect {
+        described_class.set_node(frag, index: 5, type: "paragraph")
+      }.to raise_error(ArgumentError, /out of range/)
+    end
+
+    it "raises when heading level is missing" do
+      expect {
+        described_class.set_node(frag, index: 0, type: "heading")
+      }.to raise_error(ArgumentError, /level/)
+    end
+  end
+
+  describe ".insert_content_at" do
+    before do
+      populate([
+        {"type" => "paragraph", "content" => [{"type" => "text", "text" => "First"}]},
+        {"type" => "paragraph", "content" => [{"type" => "text", "text" => "Second"}]}
+      ])
+    end
+
+    it "inserts a paragraph at an index" do
+      described_class.insert_content_at(frag, index: 1, blocks: [
+        {"type" => "paragraph", "text" => "Inserted"}
+      ])
+      expect(paragraphs).to eq(["First", "Inserted", "Second"])
+    end
+
+    it "inserts at the beginning" do
+      described_class.insert_content_at(frag, index: 0, blocks: [
+        {"type" => "paragraph", "text" => "Before all"}
+      ])
+      expect(paragraphs[0]).to eq("Before all")
+    end
+
+    it "inserts at the end" do
+      described_class.insert_content_at(frag, index: 2, blocks: [
+        {"type" => "paragraph", "text" => "After all"}
+      ])
+      expect(paragraphs.last).to eq("After all")
+    end
+
+    it "inserts a heading with level" do
+      described_class.insert_content_at(frag, index: 0, blocks: [
+        {"type" => "heading", "level" => 2, "text" => "New Heading"}
+      ])
+      json = fragment_json
+      expect(json["content"][0]["type"]).to eq("heading")
+      expect(json["content"][0]["attrs"]["level"]).to eq("2")
+    end
+
+    it "inserts multiple blocks" do
+      described_class.insert_content_at(frag, index: 1, blocks: [
+        {"type" => "paragraph", "text" => "A"},
+        {"type" => "paragraph", "text" => "B"}
+      ])
+      expect(paragraphs).to eq(["First", "A", "B", "Second"])
+    end
+
+    it "inserts a bullet list" do
+      described_class.insert_content_at(frag, index: 0, blocks: [
+        {"type" => "bulletList", "items" => ["one", "two"]}
+      ])
+      json = fragment_json
+      expect(json["content"][0]["type"]).to eq("bulletList")
+    end
+
+    it "raises for empty blocks" do
+      expect {
+        described_class.insert_content_at(frag, index: 0, blocks: [])
+      }.to raise_error(ArgumentError, /non-empty/)
+    end
+
+    it "raises for too many blocks" do
+      blocks = 51.times.map { {"type" => "paragraph", "text" => "x"} }
+      expect {
+        described_class.insert_content_at(frag, index: 0, blocks: blocks)
+      }.to raise_error(ArgumentError, /max/)
+    end
+  end
+
+  describe ".delete_range" do
+    before do
+      populate([
+        {"type" => "paragraph", "content" => [{"type" => "text", "text" => "First"}]},
+        {"type" => "paragraph", "content" => [{"type" => "text", "text" => "Second"}]},
+        {"type" => "paragraph", "content" => [{"type" => "text", "text" => "Third"}]}
+      ])
+    end
+
+    it "deletes a single block" do
+      described_class.delete_range(frag, from: 1, to: 1)
+      expect(paragraphs).to eq(["First", "Third"])
+    end
+
+    it "deletes a range of blocks" do
+      described_class.delete_range(frag, from: 0, to: 1)
+      expect(paragraphs).to eq(["Third"])
+    end
+
+    it "deletes all blocks" do
+      described_class.delete_range(frag, from: 0, to: 2)
+      expect(paragraphs).to eq([])
+    end
+
+    it "raises when from > to" do
+      expect {
+        described_class.delete_range(frag, from: 2, to: 0)
+      }.to raise_error(ArgumentError, /must be <= to/)
+    end
+
+    it "raises when index out of range" do
+      expect {
+        described_class.delete_range(frag, from: 0, to: 5)
+      }.to raise_error(ArgumentError, /out of range/)
+    end
+  end
+
+  describe ".set_title" do
+    let(:title_frag) { doc.get_xml_fragment("title") }
+
+    before do
+      Yrb::Prosemirror.json_to_fragment(title_frag, {
+        "type" => "doc",
+        "content" => [{"type" => "paragraph", "content" => [{"type" => "text", "text" => "Old Title"}]}]
+      })
+    end
+
+    it "replaces the title text" do
+      described_class.set_title(title_frag, title: "New Title")
+      text = title_frag.to_a.first.to_a.map(&:to_s).join
+      expect(text).to eq("New Title")
+    end
+
+    it "works on empty fragment" do
+      empty_frag = doc.get_xml_fragment("empty_title")
+      described_class.set_title(empty_frag, title: "Brand New")
+      text = empty_frag.to_a.first.to_a.map(&:to_s).join
+      expect(text).to eq("Brand New")
+    end
+  end
+
+  describe "cross-environment fixtures" do
+    fixtures = JSON.parse(File.read(File.join(__dir__, "../../fixtures/prosemirror_operations.json")))
+
+    fixtures["operations"].each do |op|
+      it "produces expected output for #{op["name"]}" do
+        target_frag = if op["command"] == "set_title"
+          doc.get_xml_fragment("title_#{op["name"]}")
+        else
+          frag
+        end
+
+        Yrb::Prosemirror.json_to_fragment(target_frag, op["initial"])
+
+        args = op["args"].transform_keys(&:to_sym)
+        case op["command"]
+        when "replace_text"
+          described_class.replace_text(target_frag, **args)
+        when "set_node"
+          args[:attrs] = args[:attrs]&.transform_keys(&:to_s) if args[:attrs]
+          described_class.set_node(target_frag, **args)
+        when "insert_content_at"
+          described_class.insert_content_at(target_frag, **args)
+        when "delete_range"
+          described_class.delete_range(target_frag, **args)
+        when "set_title"
+          described_class.set_title(target_frag, **args)
+        end
+
+        result = Yrb::Prosemirror.fragment_to_json(target_frag)
+        expect(result["content"]).to eq(op["expected"]["content"])
+      end
+    end
+  end
+end
