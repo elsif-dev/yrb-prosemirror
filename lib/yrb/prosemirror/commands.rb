@@ -171,10 +171,10 @@ module Yrb
         mark_attrs = { "authorId" => author_id, "batchId" => batch_id, "createdAt" => Time.now.iso8601 }
 
         # Mark existing text for deletion
-        text_node.format(pos, find.length, { "suggestionDelete" => JSON.generate(mark_attrs) })
+        text_node.format(pos, find.length, { "suggestionDelete" => mark_attrs })
 
         # Insert replacement with add mark
-        text_node.insert(pos + find.length, replace, { "suggestionAdd" => JSON.generate(mark_attrs) })
+        text_node.insert(pos + find.length, replace, { "suggestionAdd" => mark_attrs })
       end
 
       # Suggest inserting content blocks at a specific index with suggestion marks.
@@ -211,7 +211,7 @@ module Yrb
             next unless child.is_a?(Y::XMLText)
 
             text_len = child.to_s.length
-            child.format(0, text_len, { "suggestionAdd" => JSON.generate(mark_attrs) }) if text_len.positive?
+            child.format(0, text_len, { "suggestionAdd" => mark_attrs }) if text_len.positive?
           end
         end
       end
@@ -243,7 +243,7 @@ module Yrb
             next unless child.is_a?(Y::XMLText)
 
             text_len = child.to_s.length
-            child.format(0, text_len, { "suggestionDelete" => JSON.generate(mark_attrs) }) if text_len.positive?
+            child.format(0, text_len, { "suggestionDelete" => mark_attrs }) if text_len.positive?
           end
         end
       end
@@ -459,7 +459,8 @@ module Yrb
           text = chunk.insert
           len = text.is_a?(String) ? text.length : 0
           if chunk.attrs && chunk.attrs[mark_name]
-            attrs = JSON.parse(chunk.attrs[mark_name])
+            raw = chunk.attrs[mark_name]
+            attrs = raw.is_a?(String) ? JSON.parse(raw) : raw
             text_node.format(offset, len, { mark_name => nil }) if attrs["batchId"] == batch_id
           end
           offset += len
@@ -476,7 +477,8 @@ module Yrb
           text = chunk.insert
           len = text.is_a?(String) ? text.length : 0
           if chunk.attrs && chunk.attrs[mark_name]
-            attrs = JSON.parse(chunk.attrs[mark_name])
+            raw = chunk.attrs[mark_name]
+            attrs = raw.is_a?(String) ? JSON.parse(raw) : raw
             ranges_to_delete << { offset: offset, length: len } if attrs["batchId"] == batch_id
           end
           offset += len
