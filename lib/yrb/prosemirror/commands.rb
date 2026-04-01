@@ -168,13 +168,15 @@ module Yrb
         pos = current_text.index(find)
         raise ArgumentError, "Text '#{find[0..49]}' not found in paragraph #{index}" unless pos
 
-        mark_attrs = { "authorId" => author_id, "batchId" => batch_id, "createdAt" => Time.now.iso8601 }
+        # Use batchId as the simple string value -- Y.js formatting attributes
+        # only support primitives (strings, numbers, booleans, null).
+        # Nested objects get JSON-stringified during binary encoding.
 
         # Mark existing text for deletion
-        text_node.format(pos, find.length, { "suggestionDelete" => mark_attrs })
+        text_node.format(pos, find.length, {"suggestionDelete" => batch_id})
 
         # Insert replacement with add mark
-        text_node.insert(pos + find.length, replace, { "suggestionAdd" => mark_attrs })
+        text_node.insert(pos + find.length, replace, {"suggestionAdd" => batch_id})
       end
 
       # Suggest inserting content blocks at a specific index with suggestion marks.
@@ -197,8 +199,7 @@ module Yrb
 
         # Then mark the inserted blocks
         children = fragment.to_a
-        block_attr = JSON.generate({ "action" => "add", "authorId" => author_id, "batchId" => batch_id })
-        mark_attrs = { "authorId" => author_id, "batchId" => batch_id, "createdAt" => Time.now.iso8601 }
+        block_attr = JSON.generate({"action" => "add", "authorId" => author_id, "batchId" => batch_id})
 
         blocks.size.times do |i|
           target = children[index + i]
@@ -206,12 +207,11 @@ module Yrb
 
           target.set_attribute("suggestionBlock", block_attr)
 
-          # Mark all text with suggestionAdd
           target.to_a.each do |child|
             next unless child.is_a?(Y::XMLText)
 
             text_len = child.to_s.length
-            child.format(0, text_len, { "suggestionAdd" => mark_attrs }) if text_len.positive?
+            child.format(0, text_len, {"suggestionAdd" => batch_id}) if text_len.positive?
           end
         end
       end
@@ -232,8 +232,7 @@ module Yrb
         children = fragment.to_a
         raise ArgumentError, "Index #{to} out of range (0-#{children.size - 1})" if to >= children.size
 
-        block_attr = JSON.generate({ "action" => "delete", "authorId" => author_id, "batchId" => batch_id })
-        mark_attrs = { "authorId" => author_id, "batchId" => batch_id, "createdAt" => Time.now.iso8601 }
+        block_attr = JSON.generate({"action" => "delete", "authorId" => author_id, "batchId" => batch_id})
 
         (from..to).each do |i|
           element = children[i]
@@ -243,7 +242,7 @@ module Yrb
             next unless child.is_a?(Y::XMLText)
 
             text_len = child.to_s.length
-            child.format(0, text_len, { "suggestionDelete" => mark_attrs }) if text_len.positive?
+            child.format(0, text_len, {"suggestionDelete" => batch_id}) if text_len.positive?
           end
         end
       end
@@ -452,24 +451,20 @@ module Yrb
       end
 
       private_class_method def self.remove_text_mark(text_node, mark_name, batch_id)
-        # Find ranges with this mark and remove the formatting
         chunks = text_node.diff
         offset = 0
         chunks.each do |chunk|
           text = chunk.insert
           len = text.is_a?(String) ? text.length : 0
           if chunk.attrs && chunk.attrs[mark_name]
-            raw = chunk.attrs[mark_name]
-            attrs = raw.is_a?(String) ? JSON.parse(raw) : raw
-            text_node.format(offset, len, { mark_name => nil }) if attrs["batchId"] == batch_id
+            mark_value = extract_batch_id(chunk.attrs[mark_name])
+            text_node.format(offset, len, {mark_name => nil}) if mark_value == batch_id
           end
           offset += len
         end
       end
 
       private_class_method def self.delete_text_with_mark(text_node, mark_name, batch_id)
-        # Find ranges with this mark and delete the text
-        # Process in reverse to preserve offsets
         chunks = text_node.diff
         ranges_to_delete = []
         offset = 0
@@ -477,9 +472,8 @@ module Yrb
           text = chunk.insert
           len = text.is_a?(String) ? text.length : 0
           if chunk.attrs && chunk.attrs[mark_name]
-            raw = chunk.attrs[mark_name]
-            attrs = raw.is_a?(String) ? JSON.parse(raw) : raw
-            ranges_to_delete << { offset: offset, length: len } if attrs["batchId"] == batch_id
+            mark_value = extract_batch_id(chunk.attrs[mark_name])
+            ranges_to_delete << {offset: offset, length: len} if mark_value == batch_id
           end
           offset += len
         end
@@ -487,6 +481,19 @@ module Yrb
         ranges_to_delete.reverse_each do |range|
           text_node.slice!(range[:offset], range[:length])
         end
+      end
+
+      # Extract batchId from a mark value. Handles:
+      # - Simple string (the batchId itself -- new format)
+      # - Hash with "batchId" key (legacy format)
+      # - JSON string with batchId (legacy format)
+      private_class_method def self.extract_batch_id(value)
+        return value if value.is_a?(String) && !value.start_with?("{")
+        return value["batchId"] if value.is_a?(Hash)
+
+        JSON.parse(value)["batchId"]
+      rescue JSON::ParserError
+        value
       end
     end
   end
