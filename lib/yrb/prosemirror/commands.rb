@@ -289,8 +289,8 @@ module Yrb
           # Handle suggestionBlock
           block_attr_raw = element.get_attribute("suggestionBlock")
           if block_attr_raw.present?
-            block_attr = JSON.parse(block_attr_raw)
-            if block_attr["batchId"] == batch_id
+            block_attr = safe_json_parse(block_attr_raw)
+            if block_attr&.dig("batchId") == batch_id
               if block_attr["action"] == "delete"
                 indices_to_delete << idx
                 next
@@ -304,8 +304,8 @@ module Yrb
           # Handle suggestionFormat
           format_attr_raw = element.get_attribute("suggestionFormat")
           if format_attr_raw.present?
-            format_attr = JSON.parse(format_attr_raw)
-            if format_attr["batchId"] == batch_id
+            format_attr = safe_json_parse(format_attr_raw)
+            if format_attr&.dig("batchId") == batch_id
               element.set_attribute("suggestionFormat", nil)
               set_node(fragment, index: idx, type: format_attr["toType"], attrs: format_attr["toAttrs"] || {})
             end
@@ -337,8 +337,8 @@ module Yrb
           # Handle suggestionBlock
           block_attr_raw = element.get_attribute("suggestionBlock")
           if block_attr_raw.present?
-            block_attr = JSON.parse(block_attr_raw)
-            if block_attr["batchId"] == batch_id
+            block_attr = safe_json_parse(block_attr_raw)
+            if block_attr&.dig("batchId") == batch_id
               if block_attr["action"] == "add"
                 indices_to_delete << idx
                 next
@@ -358,8 +358,8 @@ module Yrb
           # Handle suggestionFormat
           format_attr_raw = element.get_attribute("suggestionFormat")
           if format_attr_raw.present?
-            format_attr = JSON.parse(format_attr_raw)
-            element.set_attribute("suggestionFormat", nil) if format_attr["batchId"] == batch_id
+            format_attr = safe_json_parse(format_attr_raw)
+            element.set_attribute("suggestionFormat", nil) if format_attr&.dig("batchId") == batch_id
           end
 
           # Handle text marks (for non-block suggestions like replace_text)
@@ -493,6 +493,13 @@ module Yrb
         JSON.parse(value)["batchId"]
       rescue JSON::ParserError
         value
+      end
+
+      # Safely parse a JSON string, returning nil on parse error.
+      private_class_method def self.safe_json_parse(str)
+        JSON.parse(str)
+      rescue JSON::ParserError
+        nil
       end
     end
   end
