@@ -170,13 +170,12 @@ module Yrb
 
         # Use batchId as the simple string value -- Y.js formatting attributes
         # only support primitives (strings, numbers, booleans, null).
-        # Nested objects get JSON-stringified during binary encoding.
 
         # Mark existing text for deletion
-        text_node.format(pos, find.length, {"suggestionDelete" => batch_id})
+        text_node.format(pos, find.length, { "suggestionDelete" => batch_id })
 
         # Insert replacement with add mark
-        text_node.insert(pos + find.length, replace, {"suggestionAdd" => batch_id})
+        text_node.insert(pos + find.length, replace, { "suggestionAdd" => batch_id })
       end
 
       # Suggest inserting content blocks at a specific index with suggestion marks.
@@ -199,7 +198,7 @@ module Yrb
 
         # Then mark the inserted blocks
         children = fragment.to_a
-        block_attr = JSON.generate({"action" => "add", "authorId" => author_id, "batchId" => batch_id})
+        block_attr = JSON.generate({ "action" => "add", "authorId" => author_id, "batchId" => batch_id })
 
         blocks.size.times do |i|
           target = children[index + i]
@@ -211,7 +210,7 @@ module Yrb
             next unless child.is_a?(Y::XMLText)
 
             text_len = child.to_s.length
-            child.format(0, text_len, {"suggestionAdd" => batch_id}) if text_len.positive?
+            child.format(0, text_len, { "suggestionAdd" => batch_id }) if text_len.positive?
           end
         end
       end
@@ -232,7 +231,7 @@ module Yrb
         children = fragment.to_a
         raise ArgumentError, "Index #{to} out of range (0-#{children.size - 1})" if to >= children.size
 
-        block_attr = JSON.generate({"action" => "delete", "authorId" => author_id, "batchId" => batch_id})
+        block_attr = JSON.generate({ "action" => "delete", "authorId" => author_id, "batchId" => batch_id })
 
         (from..to).each do |i|
           element = children[i]
@@ -242,7 +241,7 @@ module Yrb
             next unless child.is_a?(Y::XMLText)
 
             text_len = child.to_s.length
-            child.format(0, text_len, {"suggestionDelete" => batch_id}) if text_len.positive?
+            child.format(0, text_len, { "suggestionDelete" => batch_id }) if text_len.positive?
           end
         end
       end
@@ -458,7 +457,7 @@ module Yrb
           len = text.is_a?(String) ? text.length : 0
           if chunk.attrs && chunk.attrs[mark_name]
             mark_value = extract_batch_id(chunk.attrs[mark_name])
-            text_node.format(offset, len, {mark_name => nil}) if mark_value == batch_id
+            text_node.format(offset, len, { mark_name => nil }) if mark_value == batch_id
           end
           offset += len
         end
@@ -473,7 +472,7 @@ module Yrb
           len = text.is_a?(String) ? text.length : 0
           if chunk.attrs && chunk.attrs[mark_name]
             mark_value = extract_batch_id(chunk.attrs[mark_name])
-            ranges_to_delete << {offset: offset, length: len} if mark_value == batch_id
+            ranges_to_delete << { offset: offset, length: len } if mark_value == batch_id
           end
           offset += len
         end
