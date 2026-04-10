@@ -288,7 +288,7 @@ module Yrb
         children.each_with_index do |element, idx|
           # Handle suggestionBlock
           block_attr_raw = element.get_attribute("suggestionBlock")
-          if block_attr_raw
+          if block_attr_raw.present?
             block_attr = JSON.parse(block_attr_raw)
             if block_attr["batchId"] == batch_id
               if block_attr["action"] == "delete"
@@ -303,7 +303,7 @@ module Yrb
 
           # Handle suggestionFormat
           format_attr_raw = element.get_attribute("suggestionFormat")
-          if format_attr_raw
+          if format_attr_raw.present?
             format_attr = JSON.parse(format_attr_raw)
             if format_attr["batchId"] == batch_id
               element.set_attribute("suggestionFormat", nil)
@@ -336,7 +336,7 @@ module Yrb
         children.each_with_index do |element, idx|
           # Handle suggestionBlock
           block_attr_raw = element.get_attribute("suggestionBlock")
-          if block_attr_raw
+          if block_attr_raw.present?
             block_attr = JSON.parse(block_attr_raw)
             if block_attr["batchId"] == batch_id
               if block_attr["action"] == "add"
@@ -357,13 +357,13 @@ module Yrb
 
           # Handle suggestionFormat
           format_attr_raw = element.get_attribute("suggestionFormat")
-          if format_attr_raw
+          if format_attr_raw.present?
             format_attr = JSON.parse(format_attr_raw)
             element.set_attribute("suggestionFormat", nil) if format_attr["batchId"] == batch_id
           end
 
           # Handle text marks (for non-block suggestions like replace_text)
-          next if block_attr_raw # already handled above
+          next if block_attr_raw.present? # already handled above
 
           element.to_a.each do |child|
             next unless child.is_a?(Y::XMLText)
